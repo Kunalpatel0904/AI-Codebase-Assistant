@@ -77,3 +77,29 @@ class RequestTimeoutError(AppError):
 
     def __init__(self, message: str = "The request timed out. Please try again later.") -> None:
         super().__init__(message)
+
+
+# ---------------------------------------------------------------------------
+# V2 Repository Analysis Errors
+# ---------------------------------------------------------------------------
+
+class RepositoryCloneError(AppError):
+    """Raised when cloning a GitHub repository fails."""
+
+    def __init__(self, message: str = "Failed to clone repository. Please check the URL and permissions.") -> None:
+        super().__init__(message)
+
+
+class RepositoryScanError(AppError):
+    """Raised when scanning the directory fails."""
+
+    def __init__(self, message: str = "Failed to scan the repository structure.") -> None:
+        super().__init__(message)
+
+
+class InvalidRepositoryError(AppError):
+    """Raised when the repository format or content is invalid."""
+
+    def __init__(self, message: str = "The directory is not a valid repository.") -> None:
+        super().__init__(message)
+

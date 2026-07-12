@@ -1,10 +1,3 @@
-"""
-Home page — the main page orchestrator.
-
-Handles the analysis input form and delegates rendering to the
-dashboard, tutorial, and downloads components.
-"""
-
 import streamlit as st
 
 from frontend.components import render_app_header, render_error, render_success
@@ -14,6 +7,7 @@ from frontend.sidebar import render_sidebar
 from frontend.state import is_analysis_complete, reset_state
 from frontend.tutorial import render_tutorial
 from services.analysis_service import analyze_repository
+from services.dashboard_service import analyze_repository_v2
 from services.tutorial_service import get_chapters
 from utils.logger import get_logger
 
@@ -77,23 +71,33 @@ def _render_input_form() -> None:
             render_error("Please enter a GitHub repository URL.")
             return
 
+        mode = st.session_state.get("app_mode", "V1")
+
         with st.spinner("🔍 Analyzing repository… This may take a few minutes."):
-            result = analyze_repository(repo_url.strip())
+            if mode == "V2":
+                result = analyze_repository_v2(repo_url.strip())
+            else:
+                result = analyze_repository(repo_url.strip())
 
         if result.status != "success":
             render_error(result.message)
             return
 
-        # Load chapters from the generated output
-        chapters = get_chapters(result.output_folder)
-
-        # Persist everything to session state — subsequent reruns
-        # will NOT re-execute PocketFlow.
-        st.session_state.analysis_done = True
-        st.session_state.analysis_result = result
-        st.session_state.chapters = chapters
-        st.session_state.selected_chapter = 0
-        st.session_state.error_message = None
+        if mode == "V2":
+            # Version 2 does not generate chapters/tutorials (Sprint 1)
+            st.session_state.analysis_done = True
+            st.session_state.analysis_result = result
+            st.session_state.chapters = []
+            st.session_state.selected_chapter = 0
+            st.session_state.error_message = None
+        else:
+            # Version 1 loads generated markdown chapters
+            chapters = get_chapters(result.output_folder)
+            st.session_state.analysis_done = True
+            st.session_state.analysis_result = result
+            st.session_state.chapters = chapters
+            st.session_state.selected_chapter = 0
+            st.session_state.error_message = None
 
         st.rerun()
 
@@ -108,6 +112,12 @@ def _render_input_form() -> None:
 def _render_results() -> None:
     """Render dashboard, tutorial, and downloads after analysis."""
     result = st.session_state.analysis_result
+
+    if st.session_state.get("app_mode", "V1") == "V2":
+        from frontend.dashboard_v2 import render_dashboard_v2
+        render_dashboard_v2(result)
+        return
+
     chapters = st.session_state.chapters
 
     render_success(result.message)

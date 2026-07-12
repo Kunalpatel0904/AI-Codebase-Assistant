@@ -1,12 +1,8 @@
-"""
-Sidebar — navigation, repository info, chapter list, and settings.
-"""
-
 import streamlit as st
 
 import config
 from frontend.components import render_coming_soon, render_section_header
-from frontend.state import is_analysis_complete
+from frontend.state import is_analysis_complete, reset_state
 
 
 def render_sidebar() -> None:
@@ -15,6 +11,30 @@ def render_sidebar() -> None:
         # --- Branding ---
         st.title(f"{config.APP_ICON} {config.APP_TITLE}")
         st.caption(f"v{config.APP_VERSION}")
+
+        st.divider()
+
+        # --- Application Mode ---
+        app_mode_labels = [
+            "Version 1.0 (PocketFlow Engine)",
+            "Version 2.0 (Direct Repo Analysis)",
+        ]
+        
+        current_mode = st.session_state.get("app_mode", "V1")
+        default_index = 0 if current_mode == "V1" else 1
+
+        selected_mode_label = st.radio(
+            "🚀 App Mode",
+            app_mode_labels,
+            index=default_index,
+        )
+
+        new_mode = "V1" if "Version 1.0" in selected_mode_label else "V2"
+
+        if new_mode != current_mode:
+            st.session_state.app_mode = new_mode
+            reset_state()
+            st.rerun()
 
         st.divider()
 
@@ -36,32 +56,33 @@ def render_sidebar() -> None:
 
                 st.divider()
 
-            # --- Chapter navigation ---
-            chapters = st.session_state.get("chapters", [])
+            if st.session_state.get("app_mode", "V1") == "V1":
+                # --- Chapter navigation (V1 Only) ---
+                chapters = st.session_state.get("chapters", [])
 
-            if chapters:
-                render_section_header("📚", "Chapters")
+                if chapters:
+                    render_section_header("📚", "Chapters")
 
-                chapter_titles = [ch.title for ch in chapters]
+                    chapter_titles = [ch.title for ch in chapters]
 
-                selected = st.radio(
-                    "Select Chapter",
-                    chapter_titles,
-                    index=st.session_state.get("selected_chapter", 0),
-                    label_visibility="collapsed",
-                )
+                    selected = st.radio(
+                        "Select Chapter",
+                        chapter_titles,
+                        index=st.session_state.get("selected_chapter", 0),
+                        label_visibility="collapsed",
+                    )
 
-                st.session_state.selected_chapter = chapter_titles.index(
-                    selected
-                )
+                    st.session_state.selected_chapter = chapter_titles.index(
+                        selected
+                    )
+
+                    st.divider()
+
+                # --- Downloads section (V1 Only) ---
+                render_section_header("⬇️", "Downloads")
+                st.caption("Use the download buttons in the main area.")
 
                 st.divider()
-
-            # --- Downloads section ---
-            render_section_header("⬇️", "Downloads")
-            st.caption("Use the download buttons in the main area.")
-
-            st.divider()
 
         # --- Settings / V2 previews ---
         with st.expander("⚙️ Settings", expanded=False):
@@ -80,3 +101,4 @@ def render_sidebar() -> None:
             render_coming_soon("AI Chat / RAG")
             render_coming_soon("Repository Tree View")
             render_coming_soon("Search")
+
