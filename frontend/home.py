@@ -5,10 +5,8 @@ from frontend.dashboard import render_dashboard
 from frontend.downloads import render_downloads
 from frontend.sidebar import render_sidebar
 from frontend.state import is_analysis_complete, reset_state
-from frontend.tutorial import render_tutorial
-from services.analysis_service import analyze_repository
-from services.dashboard_service import analyze_repository_v2
-from services.tutorial_service import get_chapters
+from frontend.tutorial import render_tutorial, load_chapters_from_disk
+from services.document_service import generate_documentation
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -71,33 +69,21 @@ def _render_input_form() -> None:
             render_error("Please enter a GitHub repository URL.")
             return
 
-        mode = st.session_state.get("app_mode", "V1")
-
-        with st.spinner("🔍 Analyzing repository… This may take a few minutes."):
-            if mode == "V2":
-                result = analyze_repository_v2(repo_url.strip())
-            else:
-                result = analyze_repository(repo_url.strip())
+        with st.spinner("🔍 Analyzing repository and generating documentation… This may take a few minutes."):
+            result = generate_documentation(repo_url.strip())
 
         if result.status != "success":
             render_error(result.message)
             return
 
-        if mode == "V2":
-            # Version 2 does not generate chapters/tutorials (Sprint 1)
-            st.session_state.analysis_done = True
-            st.session_state.analysis_result = result
-            st.session_state.chapters = []
-            st.session_state.selected_chapter = 0
-            st.session_state.error_message = None
-        else:
-            # Version 1 loads generated markdown chapters
-            chapters = get_chapters(result.output_folder)
-            st.session_state.analysis_done = True
-            st.session_state.analysis_result = result
-            st.session_state.chapters = chapters
-            st.session_state.selected_chapter = 0
-            st.session_state.error_message = None
+        # Load chapters from the generated output files
+        chapters = load_chapters_from_disk(result.output_folder)
+
+        st.session_state.analysis_done = True
+        st.session_state.analysis_result = result
+        st.session_state.chapters = chapters
+        st.session_state.selected_chapter = 0
+        st.session_state.error_message = None
 
         st.rerun()
 
@@ -110,23 +96,21 @@ def _render_input_form() -> None:
 
 
 def _render_results() -> None:
-    """Render dashboard, tutorial, and downloads after analysis."""
+    """Render dashboard, codebase statistics, directory tree, and chapter viewer."""
     result = st.session_state.analysis_result
-
-    if st.session_state.get("app_mode", "V1") == "V2":
-        from frontend.dashboard_v2 import render_dashboard_v2
-        render_dashboard_v2(result)
-        return
-
     chapters = st.session_state.chapters
 
     render_success(result.message)
 
-    # --- Dashboard ---
+    # --- Dashboard, Statistics and Tree ---
     if result.details:
-        render_dashboard(result.details)
+        render_dashboard(
+            details=result.details,
+            stats=result.stats,
+            tree_text=result.tree_text,
+        )
 
-    # --- Tutorial viewer ---
+    # --- Chapter viewer ---
     if chapters:
         render_tutorial(chapters)
     else:

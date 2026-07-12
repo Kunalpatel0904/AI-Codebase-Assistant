@@ -14,30 +14,6 @@ def render_sidebar() -> None:
 
         st.divider()
 
-        # --- Application Mode ---
-        app_mode_labels = [
-            "Version 1.0 (PocketFlow Engine)",
-            "Version 2.0 (Direct Repo Analysis)",
-        ]
-        
-        current_mode = st.session_state.get("app_mode", "V1")
-        default_index = 0 if current_mode == "V1" else 1
-
-        selected_mode_label = st.radio(
-            "🚀 App Mode",
-            app_mode_labels,
-            index=default_index,
-        )
-
-        new_mode = "V1" if "Version 1.0" in selected_mode_label else "V2"
-
-        if new_mode != current_mode:
-            st.session_state.app_mode = new_mode
-            reset_state()
-            st.rerun()
-
-        st.divider()
-
         # --- Repository info (shown after analysis) ---
         if is_analysis_complete():
             result = st.session_state.get("analysis_result")
@@ -56,35 +32,34 @@ def render_sidebar() -> None:
 
                 st.divider()
 
-            if st.session_state.get("app_mode", "V1") == "V1":
-                # --- Chapter navigation (V1 Only) ---
-                chapters = st.session_state.get("chapters", [])
+            # --- Chapter navigation ---
+            chapters = st.session_state.get("chapters", [])
 
-                if chapters:
-                    render_section_header("📚", "Chapters")
+            if chapters:
+                render_section_header("📚", "Chapters")
 
-                    chapter_titles = [ch.title for ch in chapters]
+                chapter_titles = [ch.title for ch in chapters]
 
-                    selected = st.radio(
-                        "Select Chapter",
-                        chapter_titles,
-                        index=st.session_state.get("selected_chapter", 0),
-                        label_visibility="collapsed",
-                    )
+                selected = st.radio(
+                    "Select Chapter",
+                    chapter_titles,
+                    index=st.session_state.get("selected_chapter", 0),
+                    label_visibility="collapsed",
+                )
 
-                    st.session_state.selected_chapter = chapter_titles.index(
-                        selected
-                    )
-
-                    st.divider()
-
-                # --- Downloads section (V1 Only) ---
-                render_section_header("⬇️", "Downloads")
-                st.caption("Use the download buttons in the main area.")
+                st.session_state.selected_chapter = chapter_titles.index(
+                    selected
+                )
 
                 st.divider()
 
-        # --- Settings / V2 previews ---
+            # --- Downloads section ---
+            render_section_header("⬇️", "Downloads")
+            st.caption("Use the download buttons in the main area.")
+
+            st.divider()
+
+        # --- Settings ---
         with st.expander("⚙️ Settings", expanded=False):
             st.caption("Configuration options will appear here.")
             render_coming_soon("Custom LLM Provider")
@@ -92,13 +67,13 @@ def render_sidebar() -> None:
 
         st.divider()
 
-        # --- Coming in V2 ---
-        with st.expander("🚧 Version 2 Roadmap", expanded=False):
+        # --- Coming in V2.1+ ---
+        with st.expander("🚧 Version 2.1 Roadmap", expanded=False):
             for feature in config.V2_SOURCES:
                 render_coming_soon(feature)
 
             render_coming_soon("PDF Export")
             render_coming_soon("AI Chat / RAG")
-            render_coming_soon("Repository Tree View")
             render_coming_soon("Search")
+
 

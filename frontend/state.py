@@ -2,7 +2,7 @@
 Streamlit session state management.
 
 Centralizes all session state keys and provides helpers to initialize,
-reset, and query state.  This prevents PocketFlow reruns on every
+reset, and query state. This prevents model reruns on every
 Streamlit interaction (chapter click, download, radio button, etc.).
 """
 
@@ -30,7 +30,6 @@ _IMMUTABLE_DEFAULTS: dict[str, Any] = {
     "analysis_result": None,
     "selected_chapter": 0,
     "error_message": None,
-    "app_mode": "V1",
 }
 
 _MUTABLE_FACTORIES: dict[str, type] = {
@@ -67,10 +66,8 @@ def reset_state() -> None:
     Note: ``repo_url`` is not reset here because it is bound to the
     text_input widget.  Streamlit handles widget-key lifecycle itself.
     """
-    mode = st.session_state.get("app_mode", "V1")
     for key, default in _get_defaults().items():
         st.session_state[key] = default
-    st.session_state.app_mode = mode
 
     logger.info("Session state reset.")
 
