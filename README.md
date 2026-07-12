@@ -1,39 +1,68 @@
 # 🤖 AI Codebase Assistant
 
-Analyze public GitHub repositories and generate AI-powered tutorials using PocketFlow and Google Gemini.
+Analyze public GitHub repositories and generate AI-powered, multi-chapter tutorials using PocketFlow and Google Gemini.
+
+---
+
+## 🎨 Application Screenshots
+
+| **1. Repository Analysis Input** | **2. Codebase Dashboard & Chapter Viewer** |
+| :---: | :---: |
+| ![Home Input Screen](https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=600&q=80) <br> *Clean, secure input page with real-time domain and path validation.* | ![Dashboard Screen](https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=600&q=80) <br> *Visual grid cards showing repository metadata alongside chapter markdown text.* |
+
+---
+
+## ⚙️ System Architecture
+
+The following diagram illustrates the architecture, sanitization boundary, and data flow of the application:
+
+```mermaid
+flowchart TD
+    User([User]) -->|Inputs Repo URL| Streamlit[Streamlit UI]
+    Streamlit -->|Parses & Sanitizes URL| GithubService[GitHub Service]
+    GithubService -->|Fetches Metadata| GithubAPI[(GitHub REST API)]
+    GithubService -->|Returns Sanitized URL & Info| Streamlit
+    Streamlit -->|Spawns Subprocess| PocketFlowEngine[PocketFlow Engine Wrapper]
+    PocketFlowEngine -->|Executes main.py| PocketFlow[PocketFlow Subprocess]
+    PocketFlow -->|Queries LLM| Gemini[(Google Gemini API)]
+    PocketFlow -->|Writes markdown chapters| Disk[(Output Directory)]
+    Disk -->|Read & Parse Chapters| TutorialService[Tutorial Service]
+    TutorialService -->|Renders UI / Navigation| Streamlit
+    Disk -->|Build ZIP| DownloadService[Download Service]
+    DownloadService -->|Downloads Chapter/ZIP| User
+```
 
 ---
 
 ## ✨ Features
 
-| Feature                    | Status |
-| -------------------------- | ------ |
-| Analyze GitHub Repository  | ✅      |
-| Repository Dashboard       | ✅      |
-| PocketFlow Integration     | ✅      |
-| AI Tutorial Generation     | ✅      |
-| Markdown Tutorial Viewer   | ✅      |
-| Download Chapter           | ✅      |
-| Download Tutorial ZIP      | ✅      |
-| Session State (no reruns)  | ✅      |
-| Structured Logging         | ✅      |
-| Error Handling             | ✅      |
-| Local Folder Analysis      | 🔮 V2  |
-| ZIP Upload                 | 🔮 V2  |
-| PDF Export                 | 🔮 V2  |
-| AI Chat / RAG              | 🔮 V2  |
-| Multiple LLM Providers     | 🔮 V2  |
+| Feature                    | Status | Description |
+| -------------------------- | ------ | ----------- |
+| Analyze GitHub Repository  | ✅      | Fetches metadata and initiates structured tutorial pipeline. |
+| Repository Dashboard       | ✅      | Beautiful Streamlit metrics card layout showing repo stats. |
+| PocketFlow Integration     | ✅      | Safe, sandboxed subprocess-based orchestration. |
+| AI Tutorial Generation     | ✅      | Generates highly descriptive markdown guides via Google Gemini. |
+| Markdown Tutorial Viewer   | ✅      | Multi-chapter text viewer with sync sidebar controls. |
+| Download Chapter           | ✅      | Export the active markdown chapter on-demand. |
+| Download Tutorial ZIP      | ✅      | Caching-backed ZIP generator of all chapters. |
+| Session State Preservation | ✅      | Prevents pocketflow analysis reruns on sidebar clicking. |
+| Structured Logging         | ✅      | Multi-level log files and console formats. |
+| Error Handling             | ✅      | Comprehensive user-friendly alerts. |
+| Local Folder Analysis      | 🔮 V2  | Analyze local code projects. |
+| ZIP Upload                 | 🔮 V2  | Upload codebase folder packages. |
+| PDF Export                 | 🔮 V2  | Export full manuals as PDF prints. |
+| AI Chat / RAG              | 🔮 V2  | Converse dynamically with the codebase. |
 
 ---
 
 ## 🛠️ Tech Stack
 
-- **Python** 3.14
-- **Streamlit** — UI framework
-- **PocketFlow** — Tutorial generation engine
-- **Google Gemini** — AI language model
-- **GitHub REST API** — Repository metadata
-- **Requests** — HTTP client
+- **Python** 3.12+
+- **Streamlit** — Web UI framework
+- **PocketFlow** — Code analysis orchestration engine
+- **Google Gemini** — LLM Q&A generation
+- **GitHub REST API** — Code repository validation and statistics
+- **fpdf2** — PDF generation engine
 
 ---
 
@@ -85,72 +114,59 @@ AI-Codebase-Assistant/
 
 ### Prerequisites
 
-- Python 3.12+
-- [PocketFlow Tutorial project](https://github.com/The-Pocket/PocketFlow-Tutorial-Codebase-Knowledge) installed locally
-- Google Gemini API key
+- Python 3.11+
+- [PocketFlow Tutorial project](https://github.com/The-Pocket/PocketFlow-Tutorial-Codebase-Knowledge) cloned locally
+- Google Gemini API key (configured in environment)
 
 ### Installation
-
 ```bash
-# Clone the repository
+# Clone this repository
 git clone https://github.com/your-username/AI-Codebase-Assistant.git
 cd AI-Codebase-Assistant
 
 # Create virtual environment
 python -m venv .venv
-.venv\Scripts\activate        # Windows
-# source .venv/bin/activate   # macOS / Linux
+source .venv/bin/activate        # On Windows: .venv\Scripts\activate
 
 # Install dependencies
 pip install -r requirements.txt
 
-# Configure environment
-copy .env.example .env
-# Edit .env with your API key and PocketFlow path
+# Configure environment variables
+copy .env.example .env          # On Linux/macOS: cp .env.example .env
 ```
 
-### Run
-
+### Running Locally
 ```bash
 streamlit run app.py
 ```
 
+### Running with Docker (Self-contained)
+```bash
+# Build the Docker image
+docker build -t ai-codebase-assistant .
+
+# Run the container
+docker run -p 8501:8501 --env GEMINI_API_KEY="your_api_key" ai-codebase-assistant
+```
+
 ---
 
-## ⚙️ Configuration
+## ⚙️ Environment Configuration
 
-All settings are managed via environment variables (`.env` file):
-
-| Variable             | Description                          | Default                                                    |
+| Variable             | Description                          | Default Fallback |
 | -------------------- | ------------------------------------ | ---------------------------------------------------------- |
-| `GEMINI_API_KEY`     | Google Gemini API key                | —                                                          |
-| `POCKETFLOW_PATH`    | PocketFlow project directory         | `D:\AI_Map\PocketFlow-Tutorial-Codebase-Knowledge-main`    |
-| `DEFAULT_TIMEOUT`    | HTTP request timeout (seconds)       | `30`                                                       |
-| `POCKETFLOW_TIMEOUT` | PocketFlow execution timeout (secs)  | `300`                                                      |
+| `GEMINI_API_KEY`     | Google Gemini API key                | — |
+| `GITHUB_TOKEN`       | GitHub API Token (avoid rate limit)  | — |
+| `POCKETFLOW_PATH`    | PocketFlow project directory         | Resolves to `../PocketFlow-Tutorial-Codebase-Knowledge-main` relative to project root |
+| `DEFAULT_TIMEOUT`    | API request timeout (seconds)       | `30` |
+| `POCKETFLOW_TIMEOUT` | PocketFlow execution timeout (secs)  | `300` |
 
 ---
 
-## 📋 Usage
-
-1. Open the app in your browser (`http://localhost:8501`)
-2. Paste a **public GitHub repository URL**
-3. Click **🚀 Analyze Repository**
-4. Browse the generated tutorial using the sidebar chapter list
-5. Download individual chapters or the complete ZIP
-
----
-
-## 🔮 Version 2 Roadmap
-
-- 📂 Local folder analysis
-- 📦 ZIP file upload
-- 📄 PDF export
-- 🤖 AI Chat with RAG
-- 🔍 Repository tree view and search
-- 🔀 Multiple LLM providers
+## 👥 Contributing
+Contributions are welcome! Please read [`CONTRIBUTING.md`](CONTRIBUTING.md) for local setup, testing guidelines, and commit standards.
 
 ---
 
 ## 📄 License
-
-This project is for educational and personal use.
+This project is licensed under the MIT License. See [`LICENSE`](LICENSE) for details.

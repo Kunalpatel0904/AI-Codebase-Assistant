@@ -62,12 +62,13 @@ LOG_BACKUP_COUNT: int = 3
 # ---------------------------------------------------------------------------
 # Supported Sources (Version 1)
 # ---------------------------------------------------------------------------
-SUPPORTED_SOURCES: list[str] = ["GitHub Repository"]
+SUPPORTED_SOURCES: list[str] = ["GitHub Repository"]  # Active sources in v1.0.0
 
-V2_SOURCES: list[str] = ["Local Folder", "ZIP Upload"]
+V2_SOURCES: list[str] = ["Local Folder", "ZIP Upload"]  # Planned for next release (v2.0.0)
 
 # ---------------------------------------------------------------------------
 # ZIP Uploads
 # ---------------------------------------------------------------------------
-MAX_ZIP_SIZE_MB: int = 50
+MAX_ZIP_SIZE_MB: int = 50  # Maximum upload limit for ZIP archives in MB
+
 

@@ -58,10 +58,14 @@ def parse_github_url(url: str) -> dict[str, str]:
     if parsed.scheme not in ("http", "https"):
         raise GitHubURLError("URL must start with http:// or https://.")
 
+    # Security Check: Enforce exact domain matching. This prevents host-name spoofing
+    # where domains like 'notgithub.com' or 'fake-github.com' would bypass simple substring checks.
     netloc = parsed.netloc.lower()
     if netloc != "github.com" and not netloc.endswith(".github.com"):
         raise GitHubURLError("Only GitHub repository URLs are supported.")
 
+    # Restrict path parts strictly to ['owner', 'repo']. Extra segments (like files or branches)
+    # are rejected early to enforce canonical format.
     parts = parsed.path.strip("/").split("/")
 
     if len(parts) != 2 or not parts[0] or not parts[1]:
@@ -82,6 +86,8 @@ def parse_github_url(url: str) -> dict[str, str]:
 
     logger.info("Parsed GitHub URL — owner=%s, repo=%s", owner, repository)
 
+    # Reconstruct a clean canonical URL. This prevents query parameter/fragment
+    # injection attacks from reaching the engine subprocess boundaries.
     clean_url = f"https://github.com/{owner}/{repository}"
 
     return {
