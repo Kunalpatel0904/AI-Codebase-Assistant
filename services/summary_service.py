@@ -6,11 +6,13 @@ Optimized with batching to avoid hitting API rate limits.
 
 import time
 from pathlib import Path
+from typing import Any
 from google import genai
 
 from services import prompt_service
 from utils.exceptions import GeminiAPIError, RepositoryScanError
 from utils.logger import get_logger
+from utils.gemini_client import generate_content_with_retry
 
 logger = get_logger(__name__)
 
@@ -48,7 +50,8 @@ def summarize_file_individually(
         chunk_summaries = []
 
         for idx, chunk in enumerate(chunks, 1):
-            response = client.models.generate_content(
+            res_text = generate_content_with_retry(
+                client=client,
                 model=model_name,
                 contents=prompt_service.get_file_summary_prompt(relative_path, chunk),
                 config={
@@ -56,7 +59,7 @@ def summarize_file_individually(
                     "temperature": 0.2,
                 },
             )
-            chunk_summaries.append(response.text or "")
+            chunk_summaries.append(res_text)
 
         combined_summaries = "\n\n".join(
             f"### Chunk {i} Summary:\n{summ}" for i, summ in enumerate(chunk_summaries, 1)
@@ -65,7 +68,8 @@ def summarize_file_individually(
             f"Combine the following chunk summaries for '{relative_path}' into a single, cohesive "
             f"functional summary of the entire file:\n\n{combined_summaries}"
         )
-        response = client.models.generate_content(
+        res_text = generate_content_with_retry(
+            client=client,
             model=model_name,
             contents=final_prompt,
             config={
@@ -73,9 +77,10 @@ def summarize_file_individually(
                 "temperature": 0.2,
             },
         )
-        return (response.text or "Failed to summarize chunked contents.").strip()
+        return res_text
     else:
-        response = client.models.generate_content(
+        res_text = generate_content_with_retry(
+            client=client,
             model=model_name,
             contents=prompt_service.get_file_summary_prompt(relative_path, content),
             config={
@@ -83,7 +88,7 @@ def summarize_file_individually(
                 "temperature": 0.2,
             },
         )
-        return (response.text or "No summary returned.").strip()
+        return res_text
 
 
 def summarize_files(
@@ -135,10 +140,15 @@ def summarize_files(
             file_summaries.append({"relative_path": lf.relative_path, "summary": "Core code module."})
 
     # 2. Summarize small files in batches
-    batch_size = 12
+    batch_size = 30  # Optimized from 12 to 30 to reduce calls
     for i in range(0, len(small_files), batch_size):
         batch = small_files[i : i + batch_size]
-        logger.info("Processing file summary batch %d/%d (%d files)", (i // batch_size) + 1, (len(small_files) - 1) // batch_size + 1, len(batch))
+        logger.info(
+            "Processing file summary batch %d/%d (%d files)",
+            (i // batch_size) + 1,
+            (len(small_files) - 1) // batch_size + 1,
+            len(batch),
+        )
 
         # Build prompt containing code for all files in this batch
         prompt_lines = [
@@ -163,7 +173,8 @@ def summarize_files(
         batch_prompt = "\n".join(prompt_lines)
 
         try:
-            response = client.models.generate_content(
+            res_text = generate_content_with_retry(
+                client=client,
                 model=model_name,
                 contents=batch_prompt,
                 config={
@@ -173,9 +184,8 @@ def summarize_files(
             )
             
             # Parse responses mapping path to summary
-            batch_result = response.text or ""
             parsed_summaries = {}
-            for line in batch_result.splitlines():
+            for line in res_text.splitlines():
                 if ":" in line:
                     parts = line.split(":", 1)
                     path_part = parts[0].strip().strip("*-` ")
@@ -193,7 +203,7 @@ def summarize_files(
                     summary = f"Helper script or configuration asset supporting {sf.extension} modules."
 
                 file_summaries.append({"relative_path": sf.relative_path, "summary": summary})
-            
+
             time.sleep(3.0)
 
         except Exception as exc:
@@ -265,7 +275,8 @@ def summarize_folders(
 
         batch_prompt = "\n".join(prompt_lines)
         
-        response = client.models.generate_content(
+        res_text = generate_content_with_retry(
+            client=client,
             model=model_name,
             contents=batch_prompt,
             config={
@@ -274,10 +285,8 @@ def summarize_folders(
             },
         )
 
-        batch_result = response.text or ""
         folder_summaries: dict[str, str] = {}
-        
-        for line in batch_result.splitlines():
+        for line in res_text.splitlines():
             if ":" in line:
                 parts = line.split(":", 1)
                 folder_part = parts[0].strip().strip("*-` ")
@@ -299,12 +308,10 @@ def summarize_folders(
         time.sleep(3.0)
         return final_summaries
 
-
     except Exception as exc:
         duration = time.perf_counter() - start_time
         logger.error("Summarizing folders failure: error=%s, duration=%.2fs", exc, duration)
         raise GeminiAPIError(f"Gemini API failure during folder summarization: {exc}") from exc
-
 
 
 def summarize_file(
@@ -326,4 +333,3 @@ def summarize_file(
     """
     client = genai.Client(api_key=api_key)
     return summarize_file_individually(file_path, relative_path, client, model_name)
-

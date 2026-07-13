@@ -2,6 +2,8 @@
 Chapter service — Generates codebase documentation chapters using Google Gemini.
 """
 
+import json
+import re
 import time
 from typing import Any
 from google import genai
@@ -9,6 +11,7 @@ from google import genai
 from services import prompt_service
 from utils.exceptions import GeminiAPIError
 from utils.logger import get_logger
+from utils.gemini_client import generate_content_with_retry
 
 logger = get_logger(__name__)
 
@@ -23,7 +26,7 @@ def generate_chapters(
     api_key: str,
     model_name: str = "gemini-2.5-flash",
 ) -> dict[str, str]:
-    """Generates the 6 structured markdown chapters using Gemini.
+    """Generates the 6 structured markdown chapters in a single batched Gemini API call.
 
     Args:
         repo_name: Repository name.
@@ -55,59 +58,70 @@ def generate_chapters(
         # System instruction for technical writer role
         sys_instruction = prompt_service.get_chapter_system_instruction()
 
-        # Helper to invoke Gemini
-        def _get_chapter_content(filename: str, prompt: str) -> str:
-            logger.info("Generating chapter file: %s", filename)
-            ch_start = time.perf_counter()
-            response = client.models.generate_content(
-                model=model_name,
-                contents=prompt,
-                config={
-                    "system_instruction": sys_instruction,
-                    "temperature": 0.3,
-                },
-            )
-            ch_duration = time.perf_counter() - ch_start
-            logger.info("Generated chapter file success: %s, duration=%.2fs", filename, ch_duration)
-            time.sleep(3.0)
-            return (response.text or "").strip()
-
-
-        # Chapter 1: Repository Summary
-        chapters["01_repository_summary.md"] = _get_chapter_content(
-            "01_repository_summary.md",
-            prompt_service.get_repository_summary_prompt(repo_name, details, stats, folder_summaries)
+        # Compile master prompt and call Gemini with structured JSON output configuration
+        master_prompt = prompt_service.get_chapters_master_prompt(
+            repo_name=repo_name,
+            details=details,
+            stats=stats,
+            file_summaries=file_summaries,
+            folder_summaries=folder_summaries,
+            tree_text=tree_text,
         )
 
-        # Chapter 2: Architecture Overview
-        chapters["02_architecture.md"] = _get_chapter_content(
-            "02_architecture.md",
-            prompt_service.get_architecture_prompt(repo_name, folder_summaries)
+        res_text = generate_content_with_retry(
+            client=client,
+            model=model_name,
+            contents=master_prompt,
+            config={
+                "system_instruction": sys_instruction,
+                "response_mime_type": "application/json",
+                "temperature": 0.3,
+            },
         )
 
-        # Chapter 3: Folder Structure
-        chapters["03_folder_structure.md"] = _get_chapter_content(
-            "03_folder_structure.md",
-            prompt_service.get_folder_structure_prompt(repo_name, tree_text, folder_summaries)
-        )
+        # Parse JSON mapping
+        parsed = {}
+        try:
+            parsed = json.loads(res_text)
+        except Exception as json_exc:
+            logger.warning("JSON parsing of master chapters failed: %s. Using regex parser fallback.", json_exc)
+            for key in [
+                "01_repository_summary.md",
+                "02_architecture.md",
+                "03_folder_structure.md",
+                "04_core_modules.md",
+                "05_api.md",
+                "06_utilities.md"
+            ]:
+                pattern = rf'"{key}"\s*:\s*"(.*?)"'
+                match = re.search(pattern, res_text, re.DOTALL)
+                if match:
+                    try:
+                        parsed[key] = match.group(1).encode().decode('unicode-escape', errors='ignore')
+                    except Exception:
+                        parsed[key] = match.group(1)
 
-        # Chapter 4: Core Modules
-        chapters["04_core_modules.md"] = _get_chapter_content(
-            "04_core_modules.md",
-            prompt_service.get_core_modules_prompt(repo_name, file_summaries)
-        )
+        required_keys = [
+            ("01_repository_summary.md", "Repository Summary"),
+            ("02_architecture.md", "Architecture Overview"),
+            ("03_folder_structure.md", "Folder Structure"),
+            ("04_core_modules.md", "Core Modules"),
+            ("05_api.md", "API Documentation"),
+            ("06_utilities.md", "Utilities and Configuration")
+        ]
 
-        # Chapter 5: API Documentation
-        chapters["05_api.md"] = _get_chapter_content(
-            "05_api.md",
-            prompt_service.get_api_prompt(repo_name, file_summaries)
-        )
-
-        # Chapter 6: Utilities and Configuration
-        chapters["06_utilities.md"] = _get_chapter_content(
-            "06_utilities.md",
-            prompt_service.get_utilities_prompt(repo_name, file_summaries)
-        )
+        for key, title in required_keys:
+            content = parsed.get(key)
+            if not content:
+                # If key is completely missing, lookup ignoring case or whitespace
+                alt_key = next((k for k in parsed.keys() if key in k or k in key), None)
+                if alt_key:
+                    content = parsed.get(alt_key)
+            
+            if not content:
+                content = f"# {title}\n\nDetailed codebase documentation content currently unavailable."
+            
+            chapters[key] = content.strip()
 
         duration = time.perf_counter() - start_time
         logger.info("Generating chapters success: repo=%s, duration=%.2fs", repo_name, duration)

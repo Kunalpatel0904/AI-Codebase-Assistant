@@ -25,3 +25,6 @@ Thumbs.db
 
 # IDE
 .idea/
+
+# Local cache
+.cache/
