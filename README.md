@@ -1,6 +1,6 @@
 # 🤖 AI Codebase Assistant
 
-Analyze public GitHub repositories and generate AI-powered, multi-chapter tutorials using PocketFlow and Google Gemini.
+Analyze public GitHub repositories and generate AI-powered, multi-chapter documentation using a local clone scanner and the Google Gemini API.
 
 ---
 
@@ -14,7 +14,7 @@ Analyze public GitHub repositories and generate AI-powered, multi-chapter tutori
 
 ## ⚙️ System Architecture
 
-The following diagram illustrates the architecture, sanitization boundary, and data flow of the application:
+The following diagram illustrates the architecture, sanitization boundary, and optimized data flow of the application:
 
 ```mermaid
 flowchart TD
@@ -22,12 +22,14 @@ flowchart TD
     Streamlit -->|Parses & Sanitizes URL| GithubService[GitHub Service]
     GithubService -->|Fetches Metadata| GithubAPI[(GitHub REST API)]
     GithubService -->|Returns Sanitized URL & Info| Streamlit
-    Streamlit -->|Spawns Subprocess| PocketFlowEngine[PocketFlow Engine Wrapper]
-    PocketFlowEngine -->|Executes main.py| PocketFlow[PocketFlow Subprocess]
-    PocketFlow -->|Queries LLM| Gemini[(Google Gemini API)]
-    PocketFlow -->|Writes markdown chapters| Disk[(Output Directory)]
-    Disk -->|Read & Parse Chapters| TutorialService[Tutorial Service]
-    TutorialService -->|Renders UI / Navigation| Streamlit
+    Streamlit -->|Initiates Pipeline| DocumentService[Document Service Orchestrator]
+    DocumentService -->|Shallow Clone depth=1| GitClone[Git Clone Service]
+    GitClone -->|Scan Code Files| RepoScanner[Repository Scanner]
+    RepoScanner -->|Compile Stats & Tree| StatsService[Statistics & Tree Service]
+    StatsService -->|Batched summaries| Gemini[(Google Gemini API)]
+    Gemini -->|Writes markdown chapters| Disk[(Output Directory)]
+    Disk -->|Read & Parse Chapters| TutorialLoader[Tutorial Loader]
+    TutorialLoader -->|Renders UI / Navigation| Streamlit
     Disk -->|Build ZIP| DownloadService[Download Service]
     DownloadService -->|Downloads Chapter/ZIP| User
 ```
@@ -38,20 +40,18 @@ flowchart TD
 
 | Feature                    | Status | Description |
 | -------------------------- | ------ | ----------- |
-| Analyze GitHub Repository  | ✅      | Fetches metadata and initiates structured tutorial pipeline. |
-| Repository Dashboard       | ✅      | Beautiful Streamlit metrics card layout showing repo stats. |
-| PocketFlow Integration     | ✅      | Safe, sandboxed subprocess-based orchestration. |
-| AI Tutorial Generation     | ✅      | Generates highly descriptive markdown guides via Google Gemini. |
+| Analyze GitHub Repository  | ✅      | Fetches metadata and initiates local shallow clone pipeline. |
+| Repository Dashboard       | ✅      | Beautiful Streamlit metrics card layout showing repo metadata, stats, and files counts. |
+| Codebase Statistics        | ✅      | Computes Lines of Code (LOC), Python/Markdown files, average file size, and largest file. |
+| Directory Tree Visualizer  | ✅      | Renders recursive directory folder structures in a clean explorer code box. |
+| Gemini API Optimization    | ✅      | Batches file summaries (30/request) and folder summaries (1/request) to stay below rate limits. |
+| Single-Call Chapters Gen   | ✅      | Compiles all 6 chapters in a single structured JSON request to prevent 429 quota exhaustion. |
+| Prompt Caching             | ✅      | SHA-256 hash-based disk caching to avoid redundant API queries. |
+| Exponential Backoff Retry  | ✅      | Automatically intercepts 429 status codes and delays queries according to API retryDelay values. |
 | Markdown Tutorial Viewer   | ✅      | Multi-chapter text viewer with sync sidebar controls. |
-| Download Chapter           | ✅      | Export the active markdown chapter on-demand. |
-| Download Tutorial ZIP      | ✅      | Caching-backed ZIP generator of all chapters. |
-| Session State Preservation | ✅      | Prevents pocketflow analysis reruns on sidebar clicking. |
+| Download Chapters & ZIP    | ✅      | Export active markdown chapters or download all chapters as a unified ZIP archive. |
 | Structured Logging         | ✅      | Multi-level log files and console formats. |
-| Error Handling             | ✅      | Comprehensive user-friendly alerts. |
-| Local Folder Analysis      | 🔮 V2  | Analyze local code projects. |
-| ZIP Upload                 | 🔮 V2  | Upload codebase folder packages. |
-| PDF Export                 | 🔮 V2  | Export full manuals as PDF prints. |
-| AI Chat / RAG              | 🔮 V2  | Converse dynamically with the codebase. |
+| Error Handling & Boundaries| ✅      | Comprehensive user-friendly alerts and fallback mock layouts in case of API failures. |
 
 ---
 
@@ -59,9 +59,9 @@ flowchart TD
 
 - **Python** 3.12+
 - **Streamlit** — Web UI framework
-- **PocketFlow** — Code analysis orchestration engine
-- **Google Gemini** — LLM Q&A generation
+- **Google Gemini** — LLM Q&A generation (via `google-genai` SDK)
 - **GitHub REST API** — Code repository validation and statistics
+- **GitPython** — Git clone client SDK
 - **fpdf2** — PDF generation engine
 
 ---
@@ -70,40 +70,34 @@ flowchart TD
 
 ```
 AI-Codebase-Assistant/
-├── app.py                      # Entry point
+├── app.py                      # Streamlit application entry point
 ├── config.py                   # Central configuration
-├── requirements.txt            # Dependencies
-├── .env.example                # Environment template
-│
-├── services/                   # Business logic
-│   ├── github_service.py       # GitHub API + URL parsing
-│   ├── analysis_service.py     # Analysis orchestration
-│   ├── tutorial_service.py     # Tutorial generation + reading
-│   ├── download_service.py     # Downloads + ZIP
-│   ├── local_service.py        # Local folder logic (V2)
-│   ├── zip_service.py          # ZIP uploads logic (V2)
-│   ├── pdf_service.py          # PDF export logic (V2)
-│   ├── chat_service.py         # AI Q&A Chat logic (V2)
-│   └── tree_service.py         # Directory tree fetcher (V2)
-│
-├── frontend/                   # Streamlit UI
-│   ├── home.py                 # Page orchestrator
-│   ├── sidebar.py              # Sidebar navigation
-│   ├── dashboard.py            # Repository dashboard
-│   ├── tutorial.py             # Tutorial viewer
-│   ├── downloads.py            # Download section
-│   ├── components.py           # Shared UI components
-│   └── state.py                # Session state management
-│
-├── backend/                    # Legacy wrappers / utilities
-│   └── repository_tree.py      # Folder structure printer (V2)
-│
-├── external/                   # Third-party integrations
-│   └── pocketflow.py           # PocketFlow subprocess wrapper
+├── requirements.txt            # Package dependencies
+├── .env.example                # Environment variables template
 │
 ├── utils/                      # Shared utilities
-│   ├── logger.py               # Rotating logger
-│   └── exceptions.py           # Custom exception hierarchy
+│   ├── gemini_client.py        # Centralized LLM caching & retry logic
+│   ├── exceptions.py           # Custom exception definitions
+│   └── logger.py               # Rotating logger setup
+│
+├── services/                   # Business logic layers
+│   ├── github_service.py       # GitHub REST API + URL parsing
+│   ├── github_clone_service.py # Git clone and workspace disk cleanups
+│   ├── repository_scanner.py   # Recursive local workspace scanners
+│   ├── statistics_service.py   # Code metrics calculation
+│   ├── tree_service.py         # Directory tree mapper
+│   ├── summary_service.py      # Batched code and folder summarizers
+│   ├── chapter_service.py      # Batched chapter compiler
+│   ├── markdown_service.py     # Markdown disk writer
+│   └── document_service.py     # Master documentation orchestrator
+│
+├── frontend/                   # Streamlit UI Layer
+│   ├── home.py                 # Page content manager
+│   ├── sidebar.py              # Sidebar navigation controls
+│   ├── dashboard.py            # Codebase dashboard metrics cards
+│   ├── tutorial.py             # Chapters tutorial viewer
+│   ├── components.py           # Shared UI cards & headers
+│   └── state.py                # Session state properties
 │
 └── logs/                       # Runtime logs (gitignored)
 ```
@@ -114,11 +108,11 @@ AI-Codebase-Assistant/
 
 ### Prerequisites
 
-- Python 3.11+
-- [PocketFlow Tutorial project](https://github.com/The-Pocket/PocketFlow-Tutorial-Codebase-Knowledge) cloned locally
+- Python 3.12+
 - Google Gemini API key (configured in environment)
 
 ### Installation
+
 ```bash
 # Clone this repository
 git clone https://github.com/your-username/AI-Codebase-Assistant.git
@@ -136,11 +130,13 @@ copy .env.example .env          # On Linux/macOS: cp .env.example .env
 ```
 
 ### Running Locally
+
 ```bash
 streamlit run app.py
 ```
 
 ### Running with Docker (Self-contained)
+
 ```bash
 # Build the Docker image
 docker build -t ai-codebase-assistant .
@@ -153,18 +149,12 @@ docker run -p 8501:8501 --env GEMINI_API_KEY="your_api_key" ai-codebase-assistan
 
 ## ⚙️ Environment Configuration
 
-| Variable             | Description                          | Default Fallback |
-| -------------------- | ------------------------------------ | ---------------------------------------------------------- |
-| `GEMINI_API_KEY`     | Google Gemini API key                | — |
-| `GITHUB_TOKEN`       | GitHub API Token (avoid rate limit)  | — |
-| `POCKETFLOW_PATH`    | PocketFlow project directory         | Resolves to `../PocketFlow-Tutorial-Codebase-Knowledge-main` relative to project root |
-| `DEFAULT_TIMEOUT`    | API request timeout (seconds)       | `30` |
-| `POCKETFLOW_TIMEOUT` | PocketFlow execution timeout (secs)  | `300` |
-
----
-
-## 👥 Contributing
-Contributions are welcome! Please read [`CONTRIBUTING.md`](CONTRIBUTING.md) for local setup, testing guidelines, and commit standards.
+| Variable          | Required | Description | Default Fallback |
+| ----------------- | -------- | ----------- | ---------------- |
+| `GEMINI_API_KEY`  | Yes      | Google Gemini API key | — |
+| `GEMINI_MODEL`    | No       | Google Gemini model to use | `gemini-2.5-flash` |
+| `GITHUB_TOKEN`    | No       | GitHub API Token (avoids rate limits) | — |
+| `DEFAULT_TIMEOUT` | No       | API request timeout (seconds) | `30` |
 
 ---
 
