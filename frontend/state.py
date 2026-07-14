@@ -2,7 +2,7 @@
 Streamlit session state management.
 
 Centralizes all session state keys and provides helpers to initialize,
-reset, and query state.  This prevents PocketFlow reruns on every
+reset, and query state. This prevents model reruns on every
 Streamlit interaction (chapter click, download, radio button, etc.).
 """
 

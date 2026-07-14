@@ -27,15 +27,6 @@ APP_LAYOUT: str = "wide"
 # ---------------------------------------------------------------------------
 PROJECT_ROOT: Path = Path(__file__).resolve().parent
 
-POCKETFLOW_PATH: Path = Path(
-    os.getenv(
-        "POCKETFLOW_PATH",
-        str(PROJECT_ROOT.parent / "PocketFlow-Tutorial-Codebase-Knowledge-main"),
-    )
-)
-
-POCKETFLOW_OUTPUT: Path = POCKETFLOW_PATH / "output"
-
 LOG_DIR: Path = PROJECT_ROOT / "logs"
 
 OUTPUT_DIR: Path = PROJECT_ROOT / "output"
@@ -49,7 +40,7 @@ GITHUB_API_BASE_URL: str = "https://api.github.com"
 # Timeouts (seconds)
 # ---------------------------------------------------------------------------
 DEFAULT_TIMEOUT: int = int(os.getenv("DEFAULT_TIMEOUT", "30"))
-POCKETFLOW_TIMEOUT: int = int(os.getenv("POCKETFLOW_TIMEOUT", "300"))
+
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -62,12 +53,13 @@ LOG_BACKUP_COUNT: int = 3
 # ---------------------------------------------------------------------------
 # Supported Sources (Version 1)
 # ---------------------------------------------------------------------------
-SUPPORTED_SOURCES: list[str] = ["GitHub Repository"]
+SUPPORTED_SOURCES: list[str] = ["GitHub Repository"]  # Active sources in v1.0.0
 
-V2_SOURCES: list[str] = ["Local Folder", "ZIP Upload"]
+V2_SOURCES: list[str] = ["Local Folder", "ZIP Upload"]  # Planned for next release (v2.0.0)
 
 # ---------------------------------------------------------------------------
 # ZIP Uploads
 # ---------------------------------------------------------------------------
-MAX_ZIP_SIZE_MB: int = 50
+MAX_ZIP_SIZE_MB: int = 50  # Maximum upload limit for ZIP archives in MB
+
 

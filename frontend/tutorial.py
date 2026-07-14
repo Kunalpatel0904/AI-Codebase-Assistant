@@ -1,11 +1,49 @@
-"""
-Tutorial viewer — renders the currently selected chapter.
-"""
-
 import streamlit as st
+from dataclasses import dataclass
+from pathlib import Path
 
-from services.tutorial_service import Chapter
 from frontend.components import render_section_header
+
+
+@dataclass(frozen=True)
+class Chapter:
+    """Dataclass holding documentation chapter info."""
+    title: str
+    content: str
+    filename: str
+
+
+def load_chapters_from_disk(output_folder: str) -> list[Chapter]:
+    """Loads markdown documentation files from the output folder.
+
+    Args:
+        output_folder: Folder path containing generated markdown files.
+
+    Returns:
+        list[Chapter]: Ordered list of chapters.
+    """
+    output_path = Path(output_folder)
+    chapters: list[Chapter] = []
+    if not output_path.exists():
+        return chapters
+        
+    # Read files in sorted alphabetical order
+    for md_file in sorted(output_path.glob("*.md")):
+        if md_file.name.lower() == "index.md":
+            continue
+        try:
+            content = md_file.read_text(encoding="utf-8")
+            title = md_file.name.replace(".md", "").split("_", 1)[-1].replace("_", " ").title()
+            chapters.append(
+                Chapter(
+                    title=title,
+                    content=content,
+                    filename=md_file.name,
+                )
+            )
+        except Exception:
+            pass
+    return chapters
 
 
 def render_tutorial(chapters: list[Chapter]) -> None:
@@ -45,6 +83,7 @@ def render_tutorial(chapters: list[Chapter]) -> None:
         mime="text/markdown",
         use_container_width=True,
     )
+
 
     # --- Chapter navigation (prev / next) ---
     _render_chapter_navigation(chapters, selected_index)

@@ -6,6 +6,9 @@ Supports both GitHub repositories (via API) and local directories.
 
 from pathlib import Path
 from typing import Any
+import time
+
+from services.repository_scanner import ScannedFile
 
 import requests
 
@@ -135,3 +138,87 @@ def _walk_local(current: Path, root: Path, items: list[dict[str, str]]) -> None:
             _walk_local(child, root, items)
         else:
             items.append({"path": rel, "type": "blob", "icon": get_file_icon(child.name)})
+
+
+# ---------------------------------------------------------------------------
+# V2 Recursive JSON Tree Generation
+# ---------------------------------------------------------------------------
+
+def generate_recursive_tree(scanned_files: list[ScannedFile]) -> dict[str, Any]:
+    """Generates a nested recursive dictionary structure representing the directory tree.
+
+    Args:
+        scanned_files: List of metadata objects for each scanned file.
+
+    Returns:
+        dict[str, Any]: Nested dictionary matching JSON tree structure.
+    """
+    logger.info("Generating recursive directory tree start: files=%d", len(scanned_files))
+    start_time = time.perf_counter()
+    tree: dict[str, Any] = {}
+
+    try:
+        for f in scanned_files:
+            parts = f.relative_path.split("/")
+            current = tree
+            for i, part in enumerate(parts):
+                if i == len(parts) - 1:
+                    # It's a file
+                    current[part] = {
+                        "name": part,
+                        "type": "file",
+                        "size": f.file_size,
+                        "lines": f.line_count,
+                        "extension": f.extension,
+                    }
+                else:
+                    # It's a directory
+                    if part not in current:
+                        current[part] = {
+                            "name": part,
+                            "type": "directory",
+                            "children": {},
+                        }
+                    current = current[part]["children"]
+
+        duration = time.perf_counter() - start_time
+        logger.info("Generating recursive directory tree success: duration=%.2fs", duration)
+        return tree
+
+    except Exception as exc:
+        duration = time.perf_counter() - start_time
+        logger.error("Generating recursive directory tree failure: error=%s, duration=%.2fs", exc, duration)
+        # Return empty on failure
+        return {}
+
+
+def render_tree_to_text(tree: dict[str, Any], indent: str = "") -> list[str]:
+    """Renders a nested directory tree into a formatted list of indented visual text lines.
+
+    Args:
+        tree: Nested dictionary matching JSON tree structure.
+        indent: Character spaces representing indentation levels.
+
+    Returns:
+        list[str]: Indented tree representation lines (e.g. ['📂 src/', '    📄 main.py']).
+    """
+    lines: list[str] = []
+    
+    # Sort keys: directories first (sorted), then files (sorted)
+    sorted_keys = sorted(
+        tree.keys(),
+        key=lambda k: (tree[k]["type"] != "directory", k.lower())
+    )
+
+    for key in sorted_keys:
+        item = tree[key]
+        if item["type"] == "directory":
+            lines.append(f"{indent}📁 {key}/")
+            # Recurse children
+            lines.extend(render_tree_to_text(item["children"], indent + "    "))
+        else:
+            icon = get_file_icon(key)
+            lines.append(f"{indent}{icon} {key}")
+
+    return lines
+

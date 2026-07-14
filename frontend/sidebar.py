@@ -1,7 +1,3 @@
-"""
-Sidebar — navigation, repository info, chapter list, and settings.
-"""
-
 import streamlit as st
 
 import config
@@ -63,7 +59,7 @@ def render_sidebar() -> None:
 
             st.divider()
 
-        # --- Settings / V2 previews ---
+        # --- Settings ---
         with st.expander("⚙️ Settings", expanded=False):
             st.caption("Configuration options will appear here.")
             render_coming_soon("Custom LLM Provider")
@@ -71,12 +67,13 @@ def render_sidebar() -> None:
 
         st.divider()
 
-        # --- Coming in V2 ---
-        with st.expander("🚧 Version 2 Roadmap", expanded=False):
+        # --- Coming in V2.1+ ---
+        with st.expander("🚧 Version 2.1 Roadmap", expanded=False):
             for feature in config.V2_SOURCES:
                 render_coming_soon(feature)
 
             render_coming_soon("PDF Export")
             render_coming_soon("AI Chat / RAG")
-            render_coming_soon("Repository Tree View")
             render_coming_soon("Search")
+
+

@@ -13,10 +13,6 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Clone PocketFlow dependency to a standard container path and set environment variable
-RUN git clone https://github.com/The-Pocket/PocketFlow-Tutorial-Codebase-Knowledge.git /pocketflow
-ENV POCKETFLOW_PATH=/pocketflow
-
 # Copy the rest of the application code
 COPY . .
 

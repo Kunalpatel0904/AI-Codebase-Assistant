@@ -1,10 +1,3 @@
-"""
-Home page — the main page orchestrator.
-
-Handles the analysis input form and delegates rendering to the
-dashboard, tutorial, and downloads components.
-"""
-
 import streamlit as st
 
 from frontend.components import render_app_header, render_error, render_success
@@ -12,9 +5,8 @@ from frontend.dashboard import render_dashboard
 from frontend.downloads import render_downloads
 from frontend.sidebar import render_sidebar
 from frontend.state import is_analysis_complete, reset_state
-from frontend.tutorial import render_tutorial
-from services.analysis_service import analyze_repository
-from services.tutorial_service import get_chapters
+from frontend.tutorial import render_tutorial, load_chapters_from_disk
+from services.document_service import generate_documentation
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -77,18 +69,16 @@ def _render_input_form() -> None:
             render_error("Please enter a GitHub repository URL.")
             return
 
-        with st.spinner("🔍 Analyzing repository… This may take a few minutes."):
-            result = analyze_repository(repo_url.strip())
+        with st.spinner("🔍 Analyzing repository and generating documentation… This may take a few minutes."):
+            result = generate_documentation(repo_url.strip())
 
         if result.status != "success":
             render_error(result.message)
             return
 
-        # Load chapters from the generated output
-        chapters = get_chapters(result.output_folder)
+        # Load chapters from the generated output files
+        chapters = load_chapters_from_disk(result.output_folder)
 
-        # Persist everything to session state — subsequent reruns
-        # will NOT re-execute PocketFlow.
         st.session_state.analysis_done = True
         st.session_state.analysis_result = result
         st.session_state.chapters = chapters
@@ -106,17 +96,21 @@ def _render_input_form() -> None:
 
 
 def _render_results() -> None:
-    """Render dashboard, tutorial, and downloads after analysis."""
+    """Render dashboard, codebase statistics, directory tree, and chapter viewer."""
     result = st.session_state.analysis_result
     chapters = st.session_state.chapters
 
     render_success(result.message)
 
-    # --- Dashboard ---
+    # --- Dashboard, Statistics and Tree ---
     if result.details:
-        render_dashboard(result.details)
+        render_dashboard(
+            details=result.details,
+            stats=result.stats,
+            tree_text=result.tree_text,
+        )
 
-    # --- Tutorial viewer ---
+    # --- Chapter viewer ---
     if chapters:
         render_tutorial(chapters)
     else:
