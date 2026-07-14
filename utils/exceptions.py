@@ -50,15 +50,7 @@ class GeminiAPIError(AppError):
         super().__init__(message)
 
 
-# ---------------------------------------------------------------------------
-# PocketFlow Errors
-# ---------------------------------------------------------------------------
 
-class PocketFlowError(AppError):
-    """Raised when the PocketFlow engine fails."""
-
-    def __init__(self, message: str = "PocketFlow execution failed.") -> None:
-        super().__init__(message)
 
 
 # ---------------------------------------------------------------------------

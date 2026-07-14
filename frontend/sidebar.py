@@ -2,7 +2,7 @@ import streamlit as st
 
 import config
 from frontend.components import render_coming_soon, render_section_header
-from frontend.state import is_analysis_complete, reset_state
+from frontend.state import is_analysis_complete
 
 
 def render_sidebar() -> None:
